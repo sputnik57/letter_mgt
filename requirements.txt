@@ -1,0 +1,5 @@
+streamlit
+datetime
+pandas
+openai
+chromadb  # if you're planning semantic search
