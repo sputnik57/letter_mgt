@@ -3,3 +3,5 @@ datetime
 pandas
 openai
 chromadb  # if you're planning semantic search
+python-docx==0.8.11
+PyPDF2==3.0.1
