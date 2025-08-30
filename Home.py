@@ -70,33 +70,37 @@ sample_data = {
     'zip': [90001, 92101, 94601]
 }
 
-# Cached loader
+# ✅ Cached loader that accepts raw bytes
 @st.cache_data
-def load_excel(file):
-    return pd.read_excel(file)
+def load_excel_from_bytes(file_bytes):
+    return pd.read_excel(io.BytesIO(file_bytes))
 
-# File uploader
+# 📥 Upload and cache logic
 uploaded_file = st.file_uploader("📤 Upload Excel File", type=["xlsx"])
 
-# Load data
 if uploaded_file:
-    df = load_excel(uploaded_file)
-    filename = uploaded_file.name
-    st.markdown(f"### 📁 **Loaded File:** `{filename}`")
-    st.markdown(f"📈 **Total records loaded:** {len(st.session_state.df)}")
-else:
-    df = pd.DataFrame(sample_data)
-    st.info("Using sample data. Upload an Excel file to replace it.")
+    # Read file bytes once and store in session
+    file_bytes = uploaded_file.read()
+    st.session_state.file_bytes = file_bytes
+    st.session_state.file_name = uploaded_file.name
 
-# Store in session state
-st.session_state.df = df
+    # Load and cache the DataFrame
+    df = load_excel_from_bytes(file_bytes)
+    st.session_state.df = df
+
+    st.markdown(f"### 📁 **Loaded File:** `{uploaded_file.name}`")
+    st.markdown(f"📈 **Total records loaded:** {len(df)}")
+    st.dataframe(df.head())
+else:
+    st.info("Upload an Excel file to begin.")
 
 
 
 #SOMETHING
 # Initialize session state
 if 'df' not in st.session_state:
-    st.session_state.df = load_data()
+    st.session_state.df = pd.DataFrame(sample_data)
+
 
 
 # SIDEBAR DISPLAY

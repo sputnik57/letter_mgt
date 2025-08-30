@@ -2,6 +2,9 @@ import sys
 import os
 import re
 from dotenv import load_dotenv
+import pandas as pd
+import streamlit as st
+from datetime import datetime
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -12,27 +15,18 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 env_path = os.path.join(project_root, '.env')
 load_dotenv(dotenv_path=env_path, override=True)
 
-# Debug output
-print(f"Project root: {project_root}")
-print(f"Env path: {env_path}")
-print(f"Env file exists: {os.path.exists(env_path)}")
-print(f"GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
 
-import streamlit as st
-from datetime import datetime
 try:
     from core.ocr import extract_text_from_image
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
 
-import pandas as pd
+
 
 def setup_google_credentials():
     """Setup Google Cloud credentials from environment variables"""
     cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    # st.write(f"DEBUG: cred_path from env = {cred_path}")  # Add this for debugging
-    # st.write(f"DEBUG: file exists = {os.path.exists(cred_path) if cred_path else False}")  # Add this for debugging
     
     if cred_path and os.path.exists(cred_path):
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = cred_path
@@ -44,6 +38,7 @@ def render_ocr_processing():
     
     # Check if data is loaded
     if 'df' not in st.session_state:
+        st.session_state.df = pd.DataFrame()
         st.warning("⚠️ Please load prisoner data first!")
         st.info("Navigate to the main application to upload your Excel file.")
         return

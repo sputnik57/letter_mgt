@@ -10,12 +10,10 @@ import pandas as pd
 from core.cipher import caesar_code
 from core.database import save_data
 
-if 'df' not in st.session_state:
-    st.session_state.df = pd.DataFrame()
-
 def render_add_person():
-    print("🔍 render_add_person() called")
-    st.write("✅ UI loaded")
+    # Initialize session state if needed
+    if 'df' not in st.session_state:
+        st.session_state.df = pd.DataFrame()
 
     st.markdown('<h2 class="section-header">➕ Add New Person</h2>', unsafe_allow_html=True)
 

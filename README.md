@@ -1,5 +1,3 @@
 # letter_mgt
-<<<<<<< HEAD
-This is a letter writing management system for letter exchanges. The context is 12 Step sponsoring of prisoners.
-=======
->>>>>>> 3e861a7 (Add local README.md)
+
+This browser app currently manages an Excel sheet (SQL or vector DB in the future) of letter correspondences. This particular context is for 12 Step sponsoring of prisoners where security factors are taken into consideration.
