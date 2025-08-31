@@ -4,6 +4,7 @@ import pandas as pd
 import cairo
 from io import BytesIO
 import time
+import os
 
 # Function defining PDF paper size, layout and text format
 INCHES_TO_POINTS = 72
@@ -95,8 +96,21 @@ def search_and_select_prisoners(df):
     if st.session_state.all_selected_indices:
         st.markdown("#### ✅ Currently Selected Prisoners")
         currently_selected_df = df[df.index.isin(st.session_state.all_selected_indices)]
-        st.dataframe(currently_selected_df[['fName', 'lName', 'CDCRno', 'housing', 'Unsafe?']])
+        # Show requested columns: fName, lName, CDCRno, housing, city, state, zip, Unsafe?
+        display_columns = ['fName', 'lName', 'CDCRno', 'housing', 'city', 'state', 'zip', 'Unsafe?']
+        # Filter to only include columns that exist in the dataframe
+        existing_columns = [col for col in display_columns if col in currently_selected_df.columns]
+        st.dataframe(currently_selected_df[existing_columns])
         st.markdown(f"**Total selected: {len(st.session_state.all_selected_indices)}**")
+        
+        # Add clear selections button
+        if st.button("🗑️ Clear All Selections", key="clear_selections"):
+            st.session_state.all_selected_indices.clear()
+            if 'selected_records' in st.session_state:
+                del st.session_state.selected_records
+            st.success("All selections cleared!")
+            st.rerun()
+        
         st.markdown("---")
     
     # Clear instructions for search
@@ -201,74 +215,76 @@ def search_and_select_prisoners(df):
     return pd.DataFrame()
 
 def load_data_page():
-    # """Page for loading and caching prisoner data"""
-    # st.subheader("1. Upload Prisoner Data")
-    # uploaded_file = st.file_uploader(
-    #     "Choose Excel file with prisoner data",
-    #     type=["xlsx"],
-    #     key="excel_uploader"
-    # )
-    
-    if "df" in st.session_state:  #(as per Copilot)
+    # Use the dataframe loaded in Home.py
+    if "df" in st.session_state:
         df = st.session_state.df
         st.session_state.pris_file = df
         st.session_state.data_loaded = True
-        # st.session_state.file_name = uploaded_file.name
-        if "file_name" not in st.session_state:
-            st.warning("⚠️ No file uploaded yet. Please upload a file on the Home page.")
-            st.stop()
-
-        st.dataframe(df.head(10))
-
-    else:
-        # st.warning("⚠️ No data loaded. Please upload a file on the Home page.")
-
-        st.subheader("Upload prisoner data to get started")
-        uploaded_file = st.file_uploader(
-            "Choose Excel file with prisoner data",
-            type=["xlsx"],
-            key="excel_uploader"
-         )
         
-
-    # if uploaded_file is not None:
-    #     try:
-    #         # Read the Excel file
-            # pris_file = pd.read_excel(uploaded_file, sheet_name='Sheet1')
-            # st.success("File successfully loaded!")
-            
-            # # Cache the data in session state
-            # st.session_state.pris_file = pris_file
-            # st.session_state.data_loaded = True
-            # st.session_state.file_name = uploaded_file.name
-            
-            # Show data preview
-            # with st.expander("Preview Prisoner Data"):
-            #     st.dataframe(pris_file.head(10))
+        # Show data info without PII
+        st.subheader(f"Loaded Data: {st.session_state.get('file_name', 'Unknown')}")
+        st.write(f"Total records: {len(df)}")
+        
+        # Show only non-PII information
+        st.markdown("### Data Preview (Non-PII Information Only)")
+        st.write("Data successfully loaded and ready for envelope generation.")
+        
+        # Show column names as a reference (without showing actual data)
+        st.markdown("#### Available Columns:")
+        st.write(", ".join(df.columns.tolist()))
+        
+        # Show saved PDFs
+        pdf_dir = "saved_pdfs"
+        if os.path.exists(pdf_dir):
+            saved_pdfs = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf')]
+            if saved_pdfs:
+                st.markdown("### 📁 Saved PDFs")
+                # Sort by modification time, newest first
+                saved_pdfs.sort(key=lambda x: os.path.getmtime(os.path.join(pdf_dir, x)), reverse=True)
                 
-            # st.info("Data loaded and cached! You can now navigate to other pages.")
-            
-        # except Exception as e:
-        #     st.error(f"Error processing file: {str(e)}")
-        #     st.info("Please ensure your Excel file has the required columns: fName, lName, Unsafe?, CDCRno, housing, address, city, state, zip")
-    # else:
-    #     st.info("Please upload an Excel file to get started")
+                # Show last 10 saved PDFs
+                for pdf_file in saved_pdfs[:10]:
+                    file_path = os.path.join(pdf_dir, pdf_file)
+                    file_size = os.path.getsize(file_path)
+                    file_time = time.ctime(os.path.getmtime(file_path))
+                    
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    col1.markdown(f"📄 {pdf_file}")
+                    col2.markdown(f"💾 {file_size//1024} KB")
+                    col3.markdown(f"🕒 {file_time.split()[1]} {file_time.split()[2]}")
+                    
+                    # Add download button for each saved PDF
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label="📥 Download",
+                            data=f,
+                            file_name=pdf_file,
+                            mime="application/pdf",
+                            key=f"download_{pdf_file}"
+                        )
+                if len(saved_pdfs) > 10:
+                    st.info(f"Showing 10 of {len(saved_pdfs)} saved PDFs. Check the {pdf_dir} directory for more.")
         
-    #     # Show example of expected format
-    #     with st.expander("See expected data format"):
-    #         example_data = pd.DataFrame({
-    #             'fName': ['John', 'Jane'],
-    #             'lName': ['Doe', 'Smith'],
-    #             'Unsafe?': ['', 'unsafe'],
-    #             'CDCRno': ['A12345', 'B67890'],
-    #             'housing': ['Facility A-101', 'Facility B-202'],
-    #             'address': ['123 Main St', 'PO Box 456'],
-    #             'city': ['Los Angeles', 'San Francisco'],
-    #             'state': ['CA', 'CA'],
-    #             'zip': ['90001', '94102']
-    #         })
-    #         st.dataframe(example_data)
+        # Automatically clear selection state when loading new data
+        # This ensures we start with a clean slate for prisoner selection
+        if st.session_state.get('prisoners_selected', False) or st.session_state.get('selected_prisoners') is not None:
+            if st.button("🔄 Clear Previous Selections"):
+                # Clear selection-related session state
+                keys_to_clear = [
+                    'selected_prisoners', 'all_selected_indices', 'selected_records', 
+                    'prisoners_selected'
+                ]
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.success("Previous selections cleared! You can now select new prisoners.")
+                st.rerun()
+    else:
+        st.warning("⚠️ No data loaded. Please upload a file on the Home page.")
+        st.info("Navigate to the Home page to load your prisoner data first.")
+        
 
+   
 def select_prisoners_page():
     """Page for selecting prisoners from cached data"""
     if 'data_loaded' not in st.session_state or not st.session_state.data_loaded:
@@ -276,7 +292,7 @@ def select_prisoners_page():
         st.info("Navigate to the 'Load Data' page to upload your Excel file.")
         return
     
-    st.subheader(f"Loaded Data: {st.session_state.file_name}")
+    st.subheader(f"Loaded Data: {st.session_state.get('file_name', 'Unknown')}")
     
     # Show data info
     pris_file = st.session_state.pris_file
@@ -308,7 +324,11 @@ def generate_envelopes_page():
     # Show selected prisoners
     selected_prisoners = st.session_state.selected_prisoners
     st.markdown(f"### Selected Prisoners ({len(selected_prisoners)} total)")
-    st.dataframe(selected_prisoners[['fName', 'lName', 'CDCRno', 'housing', 'Unsafe?']])
+    # Show requested columns: fName, lName, CDCRno, housing, city, state, zip, Unsafe?
+    display_columns = ['fName', 'lName', 'CDCRno', 'housing', 'city', 'state', 'zip', 'Unsafe?']
+    # Filter to only include columns that exist in the dataframe
+    existing_columns = [col for col in display_columns if col in selected_prisoners.columns]
+    st.dataframe(selected_prisoners[existing_columns])
     
     # Show breakdown by safety classification
     unsafe_count = len(selected_prisoners[selected_prisoners['Unsafe?'].str.lower().str.contains('unsafe', na=False)])
@@ -373,6 +393,37 @@ def generate_envelopes_page():
                 col2.metric("Unsafe Environment Envelopes", 0)
             
             st.success("PDFs generated successfully! Use the download buttons above.")
+            
+            # Save PDFs to server with the same timestamp
+            timestamp = time.strftime("%Y%m%d-%H%M")
+            
+            # Create directory for saved PDFs if it doesn't exist
+            pdf_dir = "saved_pdfs"
+            if not os.path.exists(pdf_dir):
+                os.makedirs(pdf_dir)
+            
+            # Save unsafe envelopes (if any)
+            if len(unsafe_list) > 0:
+                unsafe_filename = f'{pdf_dir}/envelopes_unsafe_{timestamp}.pdf'
+                with open(unsafe_filename, "wb") as f:
+                    f.write(unsafe_pdf.getbuffer())
+                st.info(f"Unsafe envelopes saved to: {unsafe_filename}")
+            
+            # Save safe envelopes
+            safe_filename = f'{pdf_dir}/envelopes_safe_{timestamp}.pdf'
+            with open(safe_filename, "wb") as f:
+                f.write(safe_pdf.getbuffer())
+            st.info(f"Safe envelopes saved to: {safe_filename}")
+            
+            # Add a button to clear selections after generation
+            if st.button("🔄 Start New Selection"):
+                # Clear all selection-related session state
+                keys_to_clear = ['selected_prisoners', 'all_selected_indices', 'selected_records', 'prisoners_selected']
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.success("Selections cleared! You can now select new prisoners.")
+                st.rerun()
 
 def main():
     st.set_page_config(
@@ -387,6 +438,10 @@ def main():
     based on environment safety classification.
     """)
     
+    # Check if this is a new session or if we need to clear stale data
+    if 'session_start_time' not in st.session_state:
+        st.session_state.session_start_time = time.time()
+    
     # Initialize session state
     if 'current_page' not in st.session_state:
         st.session_state.current_page = "Load Data"
@@ -394,6 +449,40 @@ def main():
         st.session_state.data_loaded = False
     if 'prisoners_selected' not in st.session_state:
         st.session_state.prisoners_selected = False
+    
+    # Add a button to manually clear all session state
+    if st.sidebar.button("🔄 Clear All Session Data"):
+        # Clear all Print_Envelopes related session state
+        keys_to_clear = [
+            'selected_prisoners', 'all_selected_indices', 'selected_records', 
+            'prisoners_selected', 'pris_file', 'data_loaded', 'file_name',
+            'current_page', 'session_start_time'
+        ]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.current_page = "Load Data"
+        st.session_state.data_loaded = False
+        st.session_state.prisoners_selected = False
+        st.success("All session data cleared!")
+        st.rerun()
+    
+    # Check if session data is stale (older than 1 hour) and clear it automatically
+    current_time = time.time()
+    if current_time - st.session_state.session_start_time > 3600:  # 1 hour in seconds
+        # Clear stale session data
+        keys_to_clear = [
+            'selected_prisoners', 'all_selected_indices', 'selected_records', 
+            'prisoners_selected', 'pris_file', 'data_loaded', 'file_name'
+        ]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.session_start_time = current_time
+        st.session_state.current_page = "Load Data"
+        st.session_state.data_loaded = False
+        st.session_state.prisoners_selected = False
+        st.info("Stale session data cleared automatically. Please reload your data.")
     
     # Navigation
     st.sidebar.title("Navigation")
@@ -404,14 +493,56 @@ def main():
         if st.sidebar.button(page, 
                            key=f"nav_{page}",
                            type="primary" if st.session_state.current_page == page else "secondary"):
+            # When navigating away from Generate Envelopes, clear selection state
+            # This is similar to how Add Person clears the form after submission
+            if st.session_state.current_page == "Generate Envelopes" and page != "Generate Envelopes":
+                # Clear selection-related session state when leaving the Generate Envelopes page
+                keys_to_clear = [
+                    'selected_prisoners', 'all_selected_indices', 'selected_records', 
+                    'prisoners_selected'
+                ]
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+            
             st.session_state.current_page = page
             st.rerun()
     
     # Display current page
     if st.session_state.current_page == "Load Data":
+        # Check if there's stale data and show a warning
+        stale_data_keys = ['selected_prisoners', 'all_selected_indices', 'selected_records', 'prisoners_selected']
+        has_stale_data = any(key in st.session_state for key in stale_data_keys)
+        
+        if has_stale_data:
+            st.warning("⚠️ Stale session data detected. Please use the 'Clear All Session Data' button in the sidebar if you see unexpected data.")
+        
         load_data_page()
+
+        #Confidential notification
+        st.markdown("""
+        <div style='text-align: center;'>
+            <span style='color: red; font-size: 24px; font-weight: bold;'>CONFIDENTIAL PERSONAL INFO</span>
+        </div>
+        """, unsafe_allow_html=True)
+
     elif st.session_state.current_page == "Select Prisoners":
+        # Check if there's stale data and show a warning
+        stale_data_keys = ['selected_prisoners', 'all_selected_indices', 'selected_records', 'prisoners_selected']
+        has_stale_data = any(key in st.session_state for key in stale_data_keys)
+        
+        if has_stale_data:
+            st.warning("⚠️ Stale session data detected. Please use the 'Clear All Session Data' button in the sidebar if you see unexpected data.")
+        
         select_prisoners_page()
+
+        #Confidential notification
+        st.markdown("""
+        <div style='text-align: center;'>
+            <span style='color: red; font-size: 24px; font-weight: bold;'>CONFIDENTIAL PERSONAL INFO</span>
+        </div>
+        """, unsafe_allow_html=True)
+
     elif st.session_state.current_page == "Generate Envelopes":
         generate_envelopes_page()
 

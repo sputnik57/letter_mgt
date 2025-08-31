@@ -62,6 +62,12 @@ def render_ocr_processing():
         st.markdown("3. Restart the application")
         return
 
+    # Import directory selection widget
+    from utils.directory_selection_widget import directory_selection_widget
+
+    # 📁 Directory Selection
+    directory_selection_widget()
+
     uploaded_file = st.file_uploader("Choose an image file", type=['png', 'jpg', 'jpeg'])
 
     if uploaded_file:

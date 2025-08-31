@@ -11,7 +11,13 @@ from core.cipher import caesar_code
 from core.database import save_data
 
 def render_add_person():
-    # Initialize session state if needed
+    # Initialize session state for form fields if needed
+    form_fields = ['fname', 'lname', 'cdcr', 'housing', 'address', 'city', 'state', 'zip_code', 'language', 'sponsor']
+    for field in form_fields:
+        if field not in st.session_state:
+            st.session_state[field] = ""
+
+    # Initialize session state for df if needed
     if 'df' not in st.session_state:
         st.session_state.df = pd.DataFrame()
 
@@ -21,18 +27,18 @@ def render_add_person():
         col1, col2 = st.columns(2)
 
         with col1:
-            fname = st.text_input("First Name*")
-            lname = st.text_input("Last Name*")
-            cdcr = st.text_input("CDCR Number*")
-            housing = st.text_input("Housing")
-            address = st.text_input("Address")
+            fname = st.text_input("First Name*", value=st.session_state.fname)
+            lname = st.text_input("Last Name*", value=st.session_state.lname)
+            cdcr = st.text_input("CDCR Number*", value=st.session_state.cdcr)
+            housing = st.text_input("Housing", value=st.session_state.housing)
+            address = st.text_input("Address", value=st.session_state.address)
 
         with col2:
-            city = st.text_input("City")
-            state = st.text_input("State")
-            zip_code = st.text_input("ZIP Code")
-            language = st.text_input("Language")
-            sponsor = st.text_input("Sponsor")
+            city = st.text_input("City", value=st.session_state.city)
+            state = st.text_input("State", value=st.session_state.state)
+            zip_code = st.text_input("ZIP Code", value=st.session_state.zip_code)
+            language = st.text_input("Language", value=st.session_state.language)
+            sponsor = st.text_input("Sponsor", value=st.session_state.sponsor)
 
         submitted = st.form_submit_button("Add Person", type="primary")
 
@@ -58,6 +64,11 @@ def render_add_person():
                 st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True)
                 save_data(st.session_state.df)
                 st.success(f"✅ Person added successfully! Code: {code}")
+                
+                # Clear form fields after successful submission
+                for field in form_fields:
+                    st.session_state[field] = ""
+                
                 st.rerun()
             else:
                 st.error("Please fill in required fields (marked with *)")

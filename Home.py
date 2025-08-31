@@ -58,6 +58,22 @@ st.markdown('<div class="main-header"><h1>📊 California Prisoner Outreach Prog
 
 
 # LOADING DATA FILE
+# CONFIGURATION: Columns to display in dataframes
+# This configuration can be copied to other pages where XLSX files are uploaded
+DISPLAY_COLUMNS = [
+    'Stage', 'fName', 'lName', 'Unsafe?', 'CDCRno', 'housing', 'address', 'city', 
+    'state', 'zip', 'Sponsor', 'CPID', 
+    'letter exchange (received only)', 'Step (received only)'
+]
+
+# Helper function to filter dataframe columns for display
+# This function preserves the original dataframe while showing only selected columns
+# It also handles cases where some columns might not exist in the dataframe
+def filter_display_columns(df, columns):
+    """Filter dataframe to show only specified columns that exist in the dataframe"""
+    existing_columns = [col for col in columns if col in df.columns]
+    return df[existing_columns] if existing_columns else df
+
 # Sample fallback data
 sample_data = {
     'fName': ['John', 'Jane', 'Bob'],
@@ -66,6 +82,7 @@ sample_data = {
     'Sponsor': ['Alice T', 'Dave R', 'Alice T'],
     'Stage': [12, 11, 12],
     'city': ['Los Angeles', 'San Diego', 'Oakland'],
+    'CPID':['ABC123','DEF456','GHI789'],
     'state': ['CA', 'CA', 'CA'],
     'zip': [90001, 92101, 94601]
 }
@@ -74,6 +91,12 @@ sample_data = {
 @st.cache_data
 def load_excel_from_bytes(file_bytes):
     return pd.read_excel(io.BytesIO(file_bytes))
+
+# Import directory selection widget
+from utils.directory_selection_widget import directory_selection_widget
+
+# 📥 Directory Selection
+directory_selection_widget()
 
 # 📥 Upload and cache logic
 uploaded_file = st.file_uploader("📤 Upload Excel File", type=["xlsx"])
@@ -90,7 +113,8 @@ if uploaded_file:
 
     st.markdown(f"### 📁 **Loaded File:** `{uploaded_file.name}`")
     st.markdown(f"📈 **Total records loaded:** {len(df)}")
-    st.dataframe(df.head())
+    # Display only selected columns for preview
+    st.dataframe(filter_display_columns(df.head(), DISPLAY_COLUMNS))
 else:
     st.info("Upload an Excel file to begin.")
 
@@ -117,7 +141,7 @@ st.sidebar.metric("Time", datetime.now().strftime("%H:%M"))
 #Confidential notification
 st.markdown("""
 <div style='text-align: center;'>
-    <span style='color: red; font-size: 24px; font-weight: bold;'>CONFIDENTIAL</span>
+    <span style='color: red; font-size: 24px; font-weight: bold;'>CONFIDENTIAL PERSONAL INFO</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -177,7 +201,8 @@ record_count = filtered_df.shape[0]
 
 if record_count > 0:
     st.markdown(f"**📦 Active sponsees found:** {record_count} for `{selected_sponsor}`:")
-    st.dataframe(filtered_df)
+    # Display only selected columns for filtered data
+    st.dataframe(filter_display_columns(filtered_df, DISPLAY_COLUMNS))
 else:
     st.warning(f"No active sponsees found for `{selected_sponsor}`.")
 
@@ -190,7 +215,8 @@ st.dataframe(st.session_state.df.describe(include='all').transpose())
 # PREVIEW ALL DATA
 st.markdown("### Preview Total Data")
 n = st.slider("Rows to preview", 5, 50, 10)
-st.dataframe(st.session_state.df.head(n))
+# Display only selected columns in preview slider
+st.dataframe(filter_display_columns(st.session_state.df.head(n), DISPLAY_COLUMNS))
 
 
 #Confidential notification

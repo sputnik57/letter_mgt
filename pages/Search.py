@@ -1,41 +1,52 @@
 import sys
 import os
+import pandas as pd
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 import streamlit as st
+from utils.search_widget import render_search_widget
+
+# CONFIGURATION: Columns to display in search results
+# This configuration can be customized for different search views
+DISPLAY_COLUMNS = [
+    'Stage', 'fName', 'lName', 'Unsafe?', 'CDCRno', 'housing', 'address', 'city', 
+    'state', 'zip', 'Sponsor', 'CPID', 
+    'letter exchange (received only)', 'Step (received only)'
+]
 
 def render_search():
+    st.markdown('<h2 class="section-header">🔍 Search & View Records</h2>', unsafe_allow_html=True)
+    
     # Initialize session state if needed
     if 'df' not in st.session_state:
         st.session_state.df = pd.DataFrame()
         st.warning("No data loaded yet. Please upload data in the main application.")
         return
 
-    st.markdown('<h2 class="section-header">🔍 Search & View Records</h2>', unsafe_allow_html=True)
+    # Use the reusable search widget
+    # This replaces the previous manual search implementation
+    search_results = render_search_widget(
+        df=st.session_state.df,
+        search_column='lName',
+        display_columns=DISPLAY_COLUMNS,
+        search_label="Search by Last Name",
+        button_label="Search"
+    )
+    
+    # Optional: You can process the search results further if needed
 
-    col1, col2 = st.columns([2, 1])
+    # For example, you could add additional actions on the search results
+    if search_results is not None and not search_results.empty:
 
-    with col1:
-        search_term = st.text_input("Search by Last Name:", placeholder="Enter last name")
+        #Confidential notification
+        st.markdown("""
+        <div style='text-align: center;'>
+            <span style='color: red; font-size: 24px; font-weight: bold;'>CONFIDENTIAL PERSONAL INFO</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with col2:
-        search_btn = st.button("Search", type="primary")
-
-    if search_btn and search_term:
-        try:
-            matches = st.session_state.df[
-                st.session_state.df['lName'].str.contains(search_term, case=False, na=False)
-            ]
-
-            if matches.empty:
-                st.error(f"No matches found for '{search_term}'")
-            else:
-                st.success(f"Found {len(matches)} match(es)")
-                st.dataframe(matches, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error during search: {str(e)}")
 
 render_search()
