@@ -181,6 +181,27 @@ def render_write_prisoners():
     if "last_save_time" not in st.session_state:
         st.session_state.last_save_time = time.time()
     
+    # Auto-restore the most recent session if no document is currently selected
+    # This helps prevent data loss when switching tabs or reloading the page
+    if "selected_doc" not in st.session_state or st.session_state.selected_doc is None:
+        session_files = get_session_files()
+        if session_files:
+            # Try to auto-restore the most recent session
+            most_recent_session = session_files[0]  # First one is most recent due to sorting
+            try:
+                with open(f"sessions/{most_recent_session}", "r") as f:
+                    session_data = json.load(f)
+                
+                # Only auto-restore if the session has actual content
+                if session_data.get("doc_content") and session_data.get("doc_content") != "# My Document\n\nStart typing here...\n\n- Item 1\n- Item 2\n\n**Bold text** and *italic text*":
+                    # Auto-restore the session
+                    load_session(f"sessions/{most_recent_session}")
+                    # Don't show the manual restore UI if we've auto-restored
+                    session_files = []  # Clear the list so we don't show the restore UI
+            except Exception as e:
+                # Silently fail to avoid disrupting user experience
+                pass
+    
     # Check for existing sessions and offer to restore
     # Always check for session files, not just when we think it's a fresh session
     session_files = get_session_files()
@@ -248,15 +269,44 @@ def render_write_prisoners():
                         load_session(f"sessions/{session_info['file']}")
                         st.rerun()
     
-    # Auto-save every 30 seconds
+    # Add a manual save session button in the sidebar (always visible)
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("Ctrl-Enter New Document before Saving")
+        if st.button("💾 Save Current Session"):
+            try:
+                # Save session with empty list to capture all session data
+                save_session([])
+                st.success("Session saved successfully!")
+            except Exception as e:
+                st.error(f"Error saving session: {str(e)}")
+    
+    # Auto-save every 5 seconds (increased frequency for better data protection)
     current_time = time.time()
-    if current_time - st.session_state.last_save_time > 30:
+    if current_time - st.session_state.last_save_time > 5:
         try:
-            # Only try to save if uploaded_files exists in the current scope
+            # Save session with uploaded_files if available, otherwise save with empty list
+            # This ensures we always save session data even if uploaded_files is not in scope
             if 'uploaded_files' in locals():
                 save_session(uploaded_files)
+            else:
+                # Create a mock uploaded_files list from session state to ensure all content is saved
+                mock_uploaded_files = []
+                # Add any files that have content in session state
+                for key in st.session_state:
+                    if key.startswith("doc_content_"):
+                        # Extract filename from key
+                        filename = key.replace("doc_content_", "")
+                        # Create a mock file object with just the name
+                        class MockFile:
+                            def __init__(self, name):
+                                self.name = name
+                        mock_uploaded_files.append(MockFile(filename))
+                save_session(mock_uploaded_files)
             st.session_state.last_save_time = current_time
         except Exception as e:
+            # Log the error for debugging (this will appear in the console)
+            print(f"Auto-save error: {str(e)}")
             pass  # Silently fail to avoid disrupting user experience
 
     # Title and description
@@ -449,7 +499,7 @@ def render_write_prisoners():
                         key=f"edit_area_{selected_file.name}"
                     )
                     
-                    # Update session state with current content
+                    # Update session state with current content (this ensures auto-save works)
                     st.session_state[content_key] = edited_content
                     
                     # Add explicit save button

@@ -18,13 +18,13 @@ def directory_selection_widget():
     """
     # Common directories for reference (using absolute paths for WSL reliability)
     common_directories = {
-        "Parent Directory: projects":"\\\\wsl.localhost\\Ubuntu\\home\\me-linux3\\projects",   #"",
         "Project Root: sponsor_dashboard": "\\\\wsl.localhost\\Ubuntu\\home\\me-linux3\\projects\\sponsor_dashboard",
-        "CalPOP (Windows)": "E:\\OneDrive - teKnoculture\\CODING\\CalPOP",
+        "Curriculum:": "E:\\OneDrive - teKnoculture\\SAA\\CA_prisoners\\curriculum\\my_SAA_curricula",
+        "CODING-CalPOP (Windows)": "E:\\OneDrive - teKnoculture\\CODING\\CalPOP",
         "Letters by Rey/Course (Windows): to prisoners\course_students": "E:\\OneDrive - teKnoculture\\SAA\\CA_prisoners\\to prisoners\\course_students",
-        "Windows Screenshots: ": "E:\\OneDrive\\Pictures\\Screenshots",
-        "Scanned envelopes for OCR (testing folder)": "E:\\OneDrive - teKnoculture\\CODING\\CalPOP\\automate\\data",
-        "Saved PDFs: saved_pdfs": "\\\\wsl.localhost\\Ubuntu\\home\\me-linux3\\projects\\sponsor_dashboard\\saved_pdfs",
+        "Screenshot dir: ": "E:\\OneDrive\\Pictures\\Screenshots",
+        "OCR images (testing folder)": "E:\\OneDrive - teKnoculture\\CODING\\CalPOP\\automate\\data",
+        "Saved PDFs": "\\\\wsl.localhost\\Ubuntu\\home\\me-linux3\\projects\\sponsor_dashboard\\saved_pdfs",
         "Downloaded files": "C:\\Users\\rguil\\Downloads"
 
     }
