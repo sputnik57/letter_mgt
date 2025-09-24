@@ -10,7 +10,7 @@ This app manages a database (in Excel, SQLite and a future vector) to administer
 1.1.2 Existing Sponsee Tasks
 1.2. Letter Processing Tasks
 
-2. ONEDRIVE SETUP
+2. MS ONEDRIVE SETUP
 2.1. Set up
 2.2. Communication
 2.3. Sponsor monitoring
