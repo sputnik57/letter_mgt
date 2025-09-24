@@ -80,6 +80,39 @@ def search_and_select_prisoners(df):
     
     st.subheader("2. Search and Select Prisoners")
     
+    # Check for OCR queue and display it first
+    if 'envelope_queue' in st.session_state and st.session_state.envelope_queue:
+        st.markdown("#### 📋 OCR Processing Queue")
+        st.info(f"Found {len(st.session_state.envelope_queue)} prisoners from OCR processing session")
+        
+        # Display OCR queue
+        for i, entry in enumerate(st.session_state.envelope_queue, 1):
+            st.write(f"{i}. **{entry['name']}** (CDCR #{entry['cdcr_no']}) - Added: {entry['timestamp']}")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("✅ Add OCR Queue to Selection", type="primary"):
+                # Add OCR queue prisoners to selection
+                for entry in st.session_state.envelope_queue:
+                    st.session_state.all_selected_indices.add(entry['prisoner_idx'])
+                st.success(f"Added {len(st.session_state.envelope_queue)} prisoners from OCR queue!")
+                st.rerun()
+        
+        with col2:
+            if st.button("🗑️ Clear OCR Queue"):
+                st.session_state.envelope_queue = []
+                st.success("OCR queue cleared!")
+                st.rerun()
+        
+        with col3:
+            if st.button("📋 Use OCR Queue Only", type="secondary"):
+                # Clear existing selections and use only OCR queue
+                st.session_state.all_selected_indices = {entry['prisoner_idx'] for entry in st.session_state.envelope_queue}
+                st.success("Using OCR queue only!")
+                st.rerun()
+        
+        st.markdown("---")
+    
     # Initialize session state for selections
     if 'all_selected_indices' not in st.session_state:
         st.session_state.all_selected_indices = set()
@@ -171,11 +204,12 @@ def search_and_select_prisoners(df):
             # Unique key for each checkbox
             checkbox_key = f"select_{idx}"
             
-            # Create a clear display for each prisoner - ensure all values are strings
-            prisoner_display = (
-                f"**{row['lName']}, {row['fName']}** - "
-                f"{row['housing']} [{row['CDCRno']}]"
-            )
+            # Create a clear display for each prisoner - guard missing columns
+            lname = row.get('lName', '')
+            fname = row.get('fName', '')
+            housing_val = row.get('housing', '')
+            cdcr_val = row.get('CDCRno', 'No ID')
+            prisoner_display = f"**{lname}, {fname}** - {housing_val} [{cdcr_val}]"
             
             # Show checkbox with prisoner info
             is_selected = st.checkbox(
@@ -195,6 +229,29 @@ def search_and_select_prisoners(df):
         
         # Then add back the ones that are currently selected
         st.session_state.all_selected_indices.update(current_search_selections)
+
+        # Allow adding the current selection to the unified Print Queue
+        if st.session_state.all_selected_indices:
+            if 'envelope_queue' not in st.session_state:
+                st.session_state.envelope_queue = []
+            if st.button("➕ Add Selected to Print Queue", key="add_selected_to_queue"):
+                import time as _time
+                added = 0
+                df_selected = df[df.index.isin(st.session_state.all_selected_indices)]
+                for idx, row in df_selected.iterrows():
+                    exists = any(e.get('prisoner_idx') == idx for e in st.session_state.envelope_queue)
+                    if not exists:
+                        st.session_state.envelope_queue.append({
+                            'prisoner_idx': idx,
+                            'name': f"{row.get('fName','')} {row.get('lName','')}",
+                            'cdcr_no': row.get('CDCRno',''),
+                            'housing': row.get('housing',''),
+                            'address': row.get('address',''),
+                            'timestamp': _time.strftime("%Y-%m-%d %H:%M"),
+                            'source': 'Print Envelopes Search'
+                        })
+                        added += 1
+                st.success(f"Added {added} to print queue")
         
         # Get ALL selected records (not just current search)
         if st.session_state.all_selected_indices:
@@ -222,23 +279,25 @@ def load_data_page():
         st.session_state.data_loaded = True
         
         # Show data info without PII
-        st.subheader(f"Loaded Data: {st.session_state.get('file_name', 'Unknown')}")
+        st.subheader(f"1. Load Data")
+        st.write(f"Loaded data file: {st.session_state.get('file_name', 'N/A')}")
         st.write(f"Total records: {len(df)}")
-        
+        st.write(f"(Non-PII Information Only)")
+
         # Show only non-PII information
-        st.markdown("### Data Preview (Non-PII Information Only)")
-        st.write("Data successfully loaded and ready for envelope generation.")
+        # st.markdown("### Data Preview (Non-PII Information Only)")
+        # st.write("Data successfully loaded and ready for envelope generation.")
         
-        # Show column names as a reference (without showing actual data)
-        st.markdown("#### Available Columns:")
-        st.write(", ".join(df.columns.tolist()))
+        # # Show column names as a reference (without showing actual data)
+        # st.markdown("#### Available Columns:")
+        # st.write(", ".join(df.columns.tolist()))
         
         # Show saved PDFs
         pdf_dir = "saved_pdfs"
         if os.path.exists(pdf_dir):
             saved_pdfs = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf')]
             if saved_pdfs:
-                st.markdown("### 📁 Saved PDFs")
+                st.markdown("### 📁 Saved PDF envelope files")
                 # Sort by modification time, newest first
                 saved_pdfs.sort(key=lambda x: os.path.getmtime(os.path.join(pdf_dir, x)), reverse=True)
                 
@@ -308,16 +367,63 @@ def select_prisoners_page():
         
         st.success(f"Selected {len(selected_prisoners)} prisoners!")
         st.markdown("---")
-        if st.button("📝 Generate Envelopes", type="primary"):
+        colg1, colg2 = st.columns(2)
+        with colg1:
+            if st.button("➕ Add Selected to Print Queue", key="add_sel_to_queue_select"):
+                import time as _time
+                added = 0
+                for idx, row in selected_prisoners.iterrows():
+                    exists = any(e.get('prisoner_idx') == idx for e in st.session_state.get('envelope_queue', []))
+                    if not exists:
+                        if 'envelope_queue' not in st.session_state:
+                            st.session_state.envelope_queue = []
+                        st.session_state.envelope_queue.append({
+                            'prisoner_idx': idx,
+                            'name': f"{row.get('fName','')} {row.get('lName','')}",
+                            'cdcr_no': row.get('CDCRno',''),
+                            'housing': row.get('housing',''),
+                            'address': row.get('address',''),
+                            'timestamp': _time.strftime("%Y-%m-%d %H:%M"),
+                            'source': 'Print Envelopes Search'
+                        })
+                        added += 1
+                st.success(f"Added {added} to print queue")
+        with colg2:
+            if st.button("📝 Generate from Print Queue", type="primary"):
+                if 'envelope_queue' in st.session_state and st.session_state.envelope_queue:
+                    df_src = st.session_state.pris_file
+                    indices = [e['prisoner_idx'] for e in st.session_state.envelope_queue]
+                    st.session_state.selected_prisoners = df_src[df_src.index.isin(indices)]
+                    st.session_state.prisoners_selected = True
+                    st.session_state.current_page = "Generate Envelopes"
+                    st.rerun()
+                else:
+                    st.warning("Print queue is empty")
+
+        # Keep direct generate from current selection for convenience
+        if st.button("📝 Generate Envelopes", type="secondary"):
             st.session_state.current_page = "Generate Envelopes"
             st.rerun()
 
 def generate_envelopes_page():
     """Page for generating envelopes from selected prisoners"""
     if 'prisoners_selected' not in st.session_state or not st.session_state.prisoners_selected:
-        st.warning("Please select prisoners first!")
-        st.info("Navigate to the 'Select Prisoners' page to choose prisoners.")
-        return
+        # If no explicit selection yet, attempt to build from the unified Print Queue
+        if st.session_state.get('data_loaded', False) and 'pris_file' in st.session_state and st.session_state.get('envelope_queue'):
+            df_src = st.session_state.pris_file
+            indices = [e['prisoner_idx'] for e in st.session_state.envelope_queue]
+            selected = df_src[df_src.index.isin(indices)]
+            if not selected.empty:
+                st.session_state.selected_prisoners = selected
+                st.session_state.prisoners_selected = True
+            else:
+                st.warning("Print queue indices were not found in the loaded data. Load matching data or rebuild the queue.")
+                st.info("Navigate to the 'Select Prisoners' page to choose prisoners.")
+                return
+        else:
+            st.warning("Please add prisoners to the print queue or select prisoners first!")
+            st.info("Use the 'Select Prisoners' page to add to the queue, or add directly from OCR Processing.")
+            return
     
     st.subheader("🖨️ Generate Envelopes")
     
@@ -427,16 +533,56 @@ def generate_envelopes_page():
 
 def main():
     st.set_page_config(
-        page_title="Prisoner Envelope Generator",
+        page_title="Print Envelopes",
         page_icon="✉️",
         layout="wide"
     )
     
-    st.title("✉️ Prisoner Envelope Generator")
-    st.markdown("""
-    Generate PDF envelopes for prisoner correspondence with different return addresses 
-    based on environment safety classification.
-    """)
+    st.title("✉️ Print Envelopes")
+    # st.markdown("""
+    # Generate PDF envelopes for prisoner correspondence with different return addresses 
+    # based on environment safety classification.
+    # """)
+
+    # Global OCR queue banner (visible on all subpages)
+    if 'envelope_queue' in st.session_state and st.session_state.envelope_queue:
+        qcount = len(st.session_state.envelope_queue)
+        st.info(f"📋 OCR Processing Queue: {qcount} envelope{'s' if qcount != 1 else ''} ready")
+
+        with st.expander("View OCR Queue (from OCR Processing)"):
+            for i, entry in enumerate(st.session_state.envelope_queue, 1):
+                st.write(f"{i}. **{entry.get('name','')}** (CDCR #{entry.get('cdcr_no','')}) - {entry.get('timestamp','')}")
+        
+        # Quick actions depending on data availability
+        colq1, colq2, colq3 = st.columns(3)
+        with colq1:
+            if st.button("➡️ Go to Select Prisoners"):
+                st.session_state.current_page = "Select Prisoners"
+                st.rerun()
+        with colq2:
+            if st.session_state.get('data_loaded', False) and 'pris_file' in st.session_state:
+                if st.button("✅ Add OCR Queue to Selection (Now)"):
+                    # Ensure selection set exists
+                    if 'all_selected_indices' not in st.session_state:
+                        st.session_state.all_selected_indices = set()
+                    # Add indices from queue
+                    for entry in st.session_state.envelope_queue:
+                        st.session_state.all_selected_indices.add(entry['prisoner_idx'])
+                    # Build selected_prisoners immediately
+                    df = st.session_state.pris_file
+                    selected = df[df.index.isin(st.session_state.all_selected_indices)]
+                    st.session_state.selected_prisoners = selected
+                    st.session_state.prisoners_selected = True
+                    st.success(f"Added {qcount} queued envelopes to selection")
+                    st.session_state.current_page = "Generate Envelopes"
+                    st.rerun()
+            else:
+                st.caption("Load data first to use queue actions")
+        with colq3:
+            if st.button("🗑️ Clear OCR Queue (All Pages)"):
+                st.session_state.envelope_queue = []
+                st.success("OCR queue cleared")
+                st.rerun()
     
     # Check if this is a new session or if we need to clear stale data
     if 'session_start_time' not in st.session_state:
@@ -484,19 +630,23 @@ def main():
         st.session_state.prisoners_selected = False
         st.info("Stale session data cleared automatically. Please reload your data.")
     
-    # Navigation
-    st.sidebar.title("Navigation")
-    pages = ["Load Data", "Select Prisoners", "Generate Envelopes"]
+    # Navigation of workflow
+    st.sidebar.title("Workflow")
+    steps = ["Load Data", "Select Prisoners", "Generate Envelopes"]
+    current = st.session_state.get("current_page", "Load Data")
     
-    # Create navigation buttons
-    for page in pages:
-        if st.sidebar.button(page, 
-                           key=f"nav_{page}",
-                           type="primary" if st.session_state.current_page == page else "secondary"):
-            # When navigating away from Generate Envelopes, clear selection state
-            # This is similar to how Add Person clears the form after submission
-            if st.session_state.current_page == "Generate Envelopes" and page != "Generate Envelopes":
-                # Clear selection-related session state when leaving the Generate Envelopes page
+    # Create numbered navigation buttons (labels are numbered, state uses plain names)
+    for i, name in enumerate(steps, start=1):
+        # Brand-consistent plain text numbering
+        label = f"{i}. {name}"
+        if st.sidebar.button(
+            label,
+            key=f"nav_step_{i}",
+            type="primary" if current == name else "secondary",
+            use_container_width=True
+        ):
+            # When leaving Generate Envelopes, clear selection state to avoid stale data
+            if current == "Generate Envelopes" and name != "Generate Envelopes":
                 keys_to_clear = [
                     'selected_prisoners', 'all_selected_indices', 'selected_records', 
                     'prisoners_selected'
@@ -504,8 +654,7 @@ def main():
                 for key in keys_to_clear:
                     if key in st.session_state:
                         del st.session_state[key]
-            
-            st.session_state.current_page = page
+            st.session_state.current_page = name
             st.rerun()
     
     # Display current page
@@ -527,12 +676,13 @@ def main():
         """, unsafe_allow_html=True)
 
     elif st.session_state.current_page == "Select Prisoners":
-        # Check if there's stale data and show a warning
+        # Check if there's stale data and show a warning (refined)
         stale_data_keys = ['selected_prisoners', 'all_selected_indices', 'selected_records', 'prisoners_selected']
-        has_stale_data = any(key in st.session_state for key in stale_data_keys)
+        stale_keys_present = any(key in st.session_state for key in stale_data_keys)
+        has_stale_data = stale_keys_present and not st.session_state.get('data_loaded', False)
         
         if has_stale_data:
-            st.warning("⚠️ Stale session data detected. Please use the 'Clear All Session Data' button in the sidebar if you see unexpected data.")
+            st.warning("⚠️ Selection state exists but no data is loaded. Use 'Load Data' or 'Clear All Session Data' if you see unexpected data.")
         
         select_prisoners_page()
 
